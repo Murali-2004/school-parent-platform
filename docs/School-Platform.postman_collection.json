@@ -1,0 +1,442 @@
+{
+  "info": {
+    "name": "School–Parent Platform API",
+    "description": "Import this into Postman. Set the collection variable `baseUrl` if your server is not on http://localhost:4000. Run **Auth > Login (School Admin)** first — its test script saves `accessToken`, `refreshToken` and `schoolId` automatically, and every other request uses `Bearer {{accessToken}}`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000/api/v1" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "superToken", "value": "" },
+    { "key": "schoolId", "value": "" },
+    { "key": "classId", "value": "" },
+    { "key": "sectionId", "value": "" },
+    { "key": "teacherId", "value": "" },
+    { "key": "parentId", "value": "" },
+    { "key": "studentId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/health",
+        "auth": { "type": "noauth" }
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (School Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', j.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', j.refreshToken);",
+                  "if (j.user && j.user.schoolId) pm.collectionVariables.set('schoolId', j.user.schoolId);",
+                  "pm.test('got tokens', () => pm.expect(j.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"schooladmin@example.com\",\n  \"password\": \"ChangeMe_SchoolSecret123!\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Body: { email, password, schoolId? }.\nInclude schoolId ONLY if the same email exists at more than one school (you'll get 409 telling you to)."
+          }
+        },
+        {
+          "name": "Login (Super Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('superToken', j.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"superadmin@example.com\",\n  \"password\": \"ChangeMe_SuperSecret123!\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Register (Parent or Teacher)",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Priya Sharma\",\n  \"email\": \"priya.parent@example.com\",\n  \"phone\": \"+91 98765 43210\",\n  \"password\": \"password123\",\n  \"schoolId\": \"{{schoolId}}\",\n  \"role\": \"PARENT\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register",
+            "description": "Public signup. Required: name (2-120), email, password (8-128), schoolId. Optional: phone, role (\"PARENT\" | \"TEACHER\", default PARENT). SCHOOL_ADMIN / SUPER_ADMIN cannot be created here.\nResponse includes accessToken + refreshToken for the new user."
+          }
+        },
+        {
+          "name": "Me",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/auth/me" }
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "pm.collectionVariables.set('accessToken', j.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', j.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/refresh",
+            "description": "Rotates the refresh token: the old one is revoked, a new pair is returned. Replaying an old token revokes the whole chain (401)."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Schools (SUPER_ADMIN)",
+      "item": [
+        {
+          "name": "Create School",
+          "request": {
+            "method": "POST",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{superToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Green Valley High School\",\n  \"city\": \"Pune\",\n  \"plan\": \"BASIC\",\n  \"active\": true\n}"
+            },
+            "url": "{{baseUrl}}/schools",
+            "description": "Required: name (2-160). Optional: city, plan (\"FREE\"|\"BASIC\"|\"PRO\", default FREE), active (default true)."
+          }
+        },
+        {
+          "name": "List Schools",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{superToken}}" }] },
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schools?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["schools"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "active", "value": "true", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get School by Id",
+          "request": {
+            "method": "GET",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{superToken}}" }] },
+            "header": [],
+            "url": "{{baseUrl}}/schools/{{schoolId}}",
+            "description": "SUPER_ADMIN: any school. SCHOOL_ADMIN: only their own schoolId."
+          }
+        },
+        {
+          "name": "Update School",
+          "request": {
+            "method": "PATCH",
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{superToken}}" }] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"PRO\",\n  \"active\": true\n}"
+            },
+            "url": "{{baseUrl}}/schools/{{schoolId}}",
+            "description": "Any subset of: name, city, plan, active."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Academics (SCHOOL_ADMIN)",
+      "item": [
+        {
+          "name": "Create Class",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.class) pm.collectionVariables.set('classId', j.class._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Grade 5\"\n}" },
+            "url": "{{baseUrl}}/academics/classes",
+            "description": "Required: name (1-80). schoolId is taken from your token automatically."
+          }
+        },
+        {
+          "name": "List Classes",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/academics/classes" }
+        },
+        {
+          "name": "Create Section",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.section) pm.collectionVariables.set('sectionId', j.section._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{classId}}\",\n  \"name\": \"A\"\n}"
+            },
+            "url": "{{baseUrl}}/academics/sections",
+            "description": "Required: classId (must belong to your school), name (1-80)."
+          }
+        },
+        {
+          "name": "List Sections",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academics/sections?classId={{classId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["academics", "sections"],
+              "query": [{ "key": "classId", "value": "{{classId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Teachers",
+      "item": [
+        {
+          "name": "List Teachers (SCHOOL_ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.items && j.items[0]) pm.collectionVariables.set('teacherId', j.items[0]._id);"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/teachers" }
+        },
+        {
+          "name": "My Teacher Profile (TEACHER)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/teachers/me" }
+        },
+        {
+          "name": "Update Subjects (SCHOOL_ADMIN)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjects\": [\"Mathematics\", \"Physics\"]\n}"
+            },
+            "url": "{{baseUrl}}/teachers/{{teacherId}}/subjects",
+            "description": "Required: subjects (array of strings, each 1-60, max 20)."
+          }
+        },
+        {
+          "name": "Add Assignment (SCHOOL_ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{classId}}\",\n  \"sectionId\": \"{{sectionId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/teachers/{{teacherId}}/assignments",
+            "description": "Required: classId. Optional: sectionId. Both must belong to your school. This is what teacherAssignedToClass / teacherTeachesStudent checks against."
+          }
+        },
+        {
+          "name": "Remove Assignment (SCHOOL_ADMIN)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{classId}}\",\n  \"sectionId\": \"{{sectionId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/teachers/{{teacherId}}/assignments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Parents",
+      "item": [
+        {
+          "name": "List Parents (SCHOOL_ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.items && j.items[0]) pm.collectionVariables.set('parentId', j.items[0]._id);"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/parents" }
+        },
+        {
+          "name": "My Parent Profile (PARENT)",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/parents/me" }
+        }
+      ]
+    },
+    {
+      "name": "Students",
+      "item": [
+        {
+          "name": "Create Student (SCHOOL_ADMIN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.student) pm.collectionVariables.set('studentId', j.student._id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Aarav Sharma\",\n  \"classId\": \"{{classId}}\",\n  \"sectionId\": \"{{sectionId}}\",\n  \"rollNo\": \"12\",\n  \"parentIds\": [\"{{parentId}}\"]\n}"
+            },
+            "url": "{{baseUrl}}/students",
+            "description": "Required: name (1-120), classId. Optional: sectionId, rollNo (string, max 20), parentIds (array of Parent profile _id, max 4).\nclassId/sectionId/parentIds must all belong to your school. Linking a parent updates BOTH Student.parentIds and Parent.children."
+          }
+        },
+        {
+          "name": "List Students",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/students?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["students"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "classId", "value": "{{classId}}", "disabled": true },
+                { "key": "sectionId", "value": "{{sectionId}}", "disabled": true }
+              ]
+            },
+            "description": "SCHOOL_ADMIN: every student in the school. TEACHER: only students in classes they are assigned to. PARENT: only their own children."
+          }
+        },
+        {
+          "name": "Get Student by Id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/students/{{studentId}}",
+            "description": "Row-level guard: SCHOOL_ADMIN ok; PARENT must be linked to the student; TEACHER must teach the student's class. Otherwise 403/404."
+          }
+        },
+        {
+          "name": "Update Student (SCHOOL_ADMIN)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rollNo\": \"15\",\n  \"sectionId\": \"{{sectionId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/students/{{studentId}}",
+            "description": "Any subset of: name, classId, sectionId (nullable), rollNo (nullable)."
+          }
+        },
+        {
+          "name": "Link Parent to Student (SCHOOL_ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"parentId\": \"{{parentId}}\"\n}" },
+            "url": "{{baseUrl}}/students/{{studentId}}/parents",
+            "description": "Required: parentId (a Parent profile _id in your school)."
+          }
+        }
+      ]
+    }
+  ]
+}
