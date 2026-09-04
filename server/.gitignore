@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# env — NEVER commit real secrets. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# logs
+logs/
+*.log
+npm-debug.log*
+
+# build / coverage
+dist/
+coverage/
+.nyc_output/
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
