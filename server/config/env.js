@@ -32,6 +32,19 @@ const EnvSchema = z.object({
   AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
 
   BCRYPT_ROUNDS: z.coerce.number().int().min(8).max(15).default(12),
+
+  // --- Error tracking (Sentry) --------------------------------------------
+  // All optional: if SENTRY_DSN is absent OR blank, Sentry is simply never
+  // initialised and local dev / tests run exactly as before.
+  SENTRY_DSN: z.preprocess(
+    (v) => (v === '' || v == null ? undefined : v),
+    z.string().url().optional(),
+  ),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
+  SENTRY_RELEASE: z.preprocess(
+    (v) => (v === '' || v == null ? undefined : v),
+    z.string().optional(),
+  ),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

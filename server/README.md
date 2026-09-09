@@ -14,9 +14,9 @@ carries a `schoolId` and access is scoped by **tenant → role → relationship*
 
 ```bash
 cd server
-cp .env.example .env        # then edit values (secrets!)
+cp .env.example .env        # then edit values (secrets!)  [Windows: copy .env.example .env]
 npm install
-npm run seed                # creates SUPER_ADMIN + a demo school + SCHOOL_ADMIN
+npm run seed                # creates the pilot school + admin/teachers/parents/students
 npm run dev                 # http://localhost:4000
 ```
 
@@ -47,10 +47,71 @@ server/
 │   ├── students/       Student model + CRUD (reference for the guard stack)
 │   └── academics/      Class + Section models + admin CRUD
 ├── routes/            index.js — mounts every module under /api/v1
-├── scripts/           seed.js
+├── scripts/           seed.js — pilot-school seed
+├── test/              node:test suites + helpers (testApp, factory)
+├── eslint.config.js
 ├── app.js             Express assembly (importable by tests)
 └── server.js          DB connect + listen
 ```
+
+## Seeding the pilot school
+
+`npm run seed` builds one complete, internally-consistent school for testing:
+
+| | |
+|---|---|
+| School | **Greenwood International School** |
+| SCHOOL_ADMIN | `admin@greenwood.test` |
+| Classes / Sections | Grade 1 (A, B), Grade 2 (A) |
+| Teachers | Anita Rao → Grade 1 A/B · Vikram Singh → Grade 2 A |
+| Parents / Students | Meera Nair → Aarav (1-A), Diya (1-B) · Rohan Gupta → Kabir (2-A) |
+
+Every parent↔student link is written on **both** sides (`Parent.children` and
+`Student.parentIds`). All seeded users share `SEED_DEFAULT_PASSWORD` (default
+`Pilot@12345`). Set `SEED_SUPER_ADMIN_EMAIL` to also get a cross-school SUPER_ADMIN.
+
+- **`npm run seed`** — **idempotent**. Matches rows on their natural keys
+  (school name, email, class name, roll number) and updates in place. Safe to
+  re-run; never creates duplicates.
+- **`npm run seed -- --fresh`** (or `SEED_FRESH=true`) — **destructive**. Deletes
+  every document belonging to the pilot school (scoped by `schoolId` — other
+  schools and the SUPER_ADMIN are untouched), waits 3s, then re-seeds.
+
+## Tests & lint
+
+```bash
+npm run lint          # eslint (flat config), fails on any warning
+npm test              # node:test suites in test/
+npm run test:coverage # + V8 coverage summary
+```
+
+`test/helpers/testApp.js` sets a throwaway `MONGO_URI` **before** any app module
+loads, so tests never touch your dev database:
+
+- if `MONGO_URI` is set (CI provides one), it is reused with a unique db name
+  per test file;
+- otherwise an in-process `mongodb-memory-server` is started (first run
+  downloads a `mongod` binary).
+
+CI (`.github/workflows/ci.yml`) runs `npm run lint` + `npm test` on Node 20 and
+22 against a MongoDB service container, on every push to `main` and every PR.
+
+## Error tracking (Sentry)
+
+Optional and fully guarded. With **no `SENTRY_DSN`** set, `config/sentry.js` is a
+no-op and nothing changes locally. To enable it, put your DSN in `.env`:
+
+```
+SENTRY_DSN=https://xxxx@oXXXX.ingest.sentry.io/XXXX
+SENTRY_TRACES_SAMPLE_RATE=0.1     # optional, 0..1
+SENTRY_RELEASE=school-api@0.1.0   # optional
+```
+
+`server.js` imports `config/sentry.js` before `app.js` so `Sentry.init()` runs
+first; `app.js` registers `Sentry.setupExpressErrorHandler` ahead of the app's
+error handler (it only reports 5xx / non-HTTP errors, so 4xx and 404s are not
+sent). For full auto-instrumentation, start with
+`node --import ./config/sentry.js server.js`.
 
 ## The three isolation layers (read `common/` for the full comments)
 

@@ -8,6 +8,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 
 import { env, isProd, isTest } from './config/env.js';
+import { Sentry, sentryEnabled } from './config/sentry.js';
 import { globalLimiter } from './common/middleware/rateLimiters.js';
 import { notFound, errorHandler } from './common/middleware/errorHandler.js';
 import apiRoutes from './routes/index.js';
@@ -49,6 +50,12 @@ app.use('/api', globalLimiter);
 
 // --- routes -------------------------------------------------------- - - -
 app.use('/api/v1', apiRoutes);
+
+// --- Sentry error capture (no-op unless SENTRY_DSN is set) ---------- - - -
+// Registered after the routes but before our own handlers. Sentry's default
+// filter only reports 5xx / non-HTTP errors, so 4xx ApiErrors and 404s are
+// not sent as issues.
+if (sentryEnabled) Sentry.setupExpressErrorHandler(app);
 
 // --- 404 + error handler (must be last) --------------------------- - - -
 app.use(notFound);
